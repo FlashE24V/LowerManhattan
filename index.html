@@ -12,6 +12,22 @@
   <style>
     html, body, #map { height: 100%; margin: 0; }
 
+    /* Status box (debug without opening console) */
+    .status-box{
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      z-index: 9999;
+      background: rgba(255,255,255,0.95);
+      padding: 8px 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.18);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size: 12px;
+      max-width: 360px;
+      line-height: 1.25;
+    }
+
     .filter-panel {
       background: rgba(255,255,255,0.96);
       padding: 10px;
@@ -72,18 +88,28 @@
 </head>
 <body>
   <div id="map"></div>
+  <div id="status" class="status-box">Status: initializing…</div>
 
   <script>
-    // Map init
-    const map = L.map('map', { preferCanvas: true });
+    const statusEl = document.getElementById('status');
+    function setStatus(msg){ statusEl.textContent = msg; }
+
+    // If *any* JS error happens, show it in the status box
+    window.addEventListener('error', (e) => {
+      setStatus('JS error: ' + (e.message || 'unknown error'));
+    });
+
+    // Map init (default view if CSV fails)
+    const map = L.map('map', { preferCanvas: true }).setView([40.7128, -74.0060], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // CSV (GitHub Pages, repo is FlashE24V)
-    const CSV_URL = 'https://flashe24v.github.io/FlashE24V/South_of_Canal_St.csv';
+    // IMPORTANT: pull CSV from SAME repo as index.html
+    // Works for: https://flashe24v.github.io/LowerManhattan/
+    const CSV_URL = 'South_of_Canal_St.csv';
 
     // Layers
     const markerLayer = L.layerGroup().addTo(map);
@@ -96,7 +122,6 @@
     function norm(v) {
       return String(v || '').toLowerCase().replace(/\s+/g,' ').trim();
     }
-
     function metersToLatDeg(m) { return m / 111320; }
     function metersToLngDeg(m, atLat) { return m / (111320 * Math.cos(atLat * Math.PI / 180)); }
 
@@ -109,13 +134,10 @@
     // Bigger spacing + leader lines back to the true coordinate
     function offsetPoint(lat, lng, indexInBucket) {
       if (indexInBucket === 0) return [lat, lng];
-
       const angle = (indexInBucket * 137.5) * Math.PI / 180; // golden angle
       const radiusMeters = 35 + (Math.floor(indexInBucket / 8) * 15); // wide fan-out
-
       const dLat = metersToLatDeg(radiusMeters) * Math.sin(angle);
       const dLng = metersToLngDeg(radiusMeters, lat) * Math.cos(angle);
-
       return [lat + dLat, lng + dLng];
     }
 
@@ -246,7 +268,6 @@
           render(true);
         });
 
-        // live update
         chkL2.addEventListener('change', applyNow);
         chkL3.addEventListener('change', applyNow);
         txt.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyNow(); });
@@ -257,7 +278,7 @@
     map.addControl(new FilterControl());
 
     // Render
-    function render(zoomToMarkers=false) {
+    function render(fit=false) {
       markerLayer.clearLayers();
       lineLayer.clearLayers();
 
@@ -277,7 +298,6 @@
 
         const [lat2, lng2] = offsetPoint(lat, lng, count);
 
-        // leader line + true dot
         if (count > 0) {
           L.polyline([[lat, lng], [lat2, lng2]], { weight: 2, opacity: 0.65 }).addTo(lineLayer);
         }
@@ -307,33 +327,35 @@
         `;
 
         const icon = boltIcon(chargerType, ports);
-
-        // zIndexOffset helps ensure "last one" (e.g., REVEL) is visible/clickable
         const m = L.marker([lat2, lng2], { icon, zIndexOffset: 1000 + count }).addTo(markerLayer);
         m.bindPopup(popup);
         markers.push(m);
       });
 
-      if (markers.length) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.15));
-      } else if (zoomToMarkers) {
-        // keep current view
+      if (markers.length && fit) {
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
       }
+
+      setStatus(`Status: CSV rows=${allRows.length} | showing=${markers.length} | file=${CSV_URL}`);
     }
 
     // Load CSV
+    setStatus('Status: loading CSV… ' + CSV_URL);
+
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
       skipEmptyLines: true,
-      complete: ({ data }) => {
+      complete: ({ data, errors }) => {
+        if (errors && errors.length) {
+          setStatus('CSV parsed with errors: ' + errors[0].message);
+        }
         allRows = data || [];
         render(true);
       },
       error: (err) => {
+        setStatus('CSV load error: ' + (err && err.message ? err.message : String(err)));
         console.error('CSV load error:', err);
-        alert('Could not load CSV. Confirm the GitHub Pages URL is correct and public.');
       }
     });
   </script>
