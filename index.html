@@ -4,107 +4,63 @@
   <meta charset="utf-8" />
   <title>Lower Manhattan EV Chargers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
   <style>
-    html, body { height: 100%; margin: 0; background: #0a0c10; }
+    html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
-
-    .leaflet-tile { filter: brightness(0.82) saturate(0.55) hue-rotate(190deg); }
 
     .panel {
       position: absolute; top: 14px; left: 14px; z-index: 9999;
-      background: rgba(12,15,21,0.93);
-      border: 1px solid rgba(255,255,255,0.07);
-      color: #c8d6e5;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(0,0,0,0.12);
+      color: #1a1a2e;
       padding: 14px 16px;
       border-radius: 8px;
-      box-shadow: 0 12px 36px rgba(0,0,0,.55);
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
       font-family: 'Segoe UI', system-ui, sans-serif;
       width: 256px;
       backdrop-filter: blur(8px);
     }
-    .panel h3 {
-      margin: 0 0 2px;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: .04em;
-      color: #fff;
-    }
-    .panel .sub {
-      font-size: 10.5px;
-      opacity: .45;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    .divider {
-      border: none;
-      border-top: 1px solid rgba(255,255,255,0.07);
-      margin: 10px 0;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin: 8px 0;
-    }
-    label { font-size: 12px; opacity: .85; }
-    input[type="checkbox"] { accent-color: #00d4ff; }
+    .panel h3 { margin: 0 0 2px; font-size: 13px; font-weight: 700; color: #1a1a2e; }
+    .panel .sub { font-size: 10.5px; opacity: .5; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px; }
+    .divider { border: none; border-top: 1px solid rgba(0,0,0,0.08); margin: 10px 0; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; }
+    label { font-size: 12px; opacity: .8; }
+    input[type="checkbox"] { accent-color: #0066cc; }
     .btn {
-      cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer; border: 1px solid rgba(0,0,0,0.15);
       border-radius: 6px; padding: 5px 10px;
-      background: rgba(255,255,255,0.06);
-      color: #c8d6e5; font-size: 12px;
-      transition: background .15s;
+      background: #f0f0f0; color: #333;
+      font-size: 12px; transition: background .15s;
     }
-    .btn:hover { background: rgba(255,255,255,0.12); }
+    .btn:hover { background: #e0e0e0; }
 
-    .legend { display: flex; gap: 14px; margin-top: 4px; }
-    .chip { display: flex; align-items: center; gap: 6px; font-size: 11.5px; opacity: .9; }
-    .dot { width: 9px; height: 9px; border-radius: 50%; }
+    .legend { display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; }
+    .chip { display: flex; align-items: center; gap: 5px; font-size: 11.5px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
     .stats { display: flex; gap: 8px; margin-top: 10px; }
     .stat {
-      flex: 1; background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.07);
+      flex: 1; background: #f7f7f9;
+      border: 1px solid rgba(0,0,0,0.07);
       border-radius: 6px; padding: 7px 8px; text-align: center;
     }
     .stat-num { font-size: 18px; font-weight: 700; line-height: 1; }
     .stat-lbl { font-size: 9.5px; opacity: .45; text-transform: uppercase; letter-spacing: .1em; margin-top: 2px; }
-    .stat-l2  { color: #7CFF6B; text-shadow: 0 0 10px rgba(124,255,107,.4); }
-    .stat-l3  { color: #35B6FF; text-shadow: 0 0 10px rgba(53,182,255,.4); }
-    .stat-p   { color: #ffd60a; text-shadow: 0 0 10px rgba(255,214,10,.4); }
+    .stat-l2  { color: #1a9e3f; }
+    .stat-l3  { color: #0066cc; }
+    .stat-p   { color: #cc6600; }
 
-    .hint { font-size: 10.5px; opacity: .38; line-height: 1.5; margin-top: 10px; }
+    .hint { font-size: 10.5px; opacity: .4; line-height: 1.5; margin-top: 10px; }
 
     .leaflet-popup-content-wrapper {
-      background: rgba(12,15,21,0.97) !important;
-      border: 1px solid rgba(255,255,255,0.09) !important;
       border-radius: 8px !important;
-      box-shadow: 0 8px 28px rgba(0,0,0,.6) !important;
-      color: #c8d6e5 !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15) !important;
       font-family: 'Segoe UI', system-ui, sans-serif !important;
     }
-    .leaflet-popup-tip { background: rgba(12,15,21,0.97) !important; }
-    .leaflet-popup-close-button { color: #556070 !important; }
-    .leaflet-control-zoom a {
-      background: rgba(12,15,21,0.92) !important;
-      color: #c8d6e5 !important;
-      border-color: rgba(255,255,255,0.08) !important;
-    }
-    .leaflet-control-zoom a:hover { background: rgba(255,255,255,0.08) !important; }
-    .leaflet-control-attribution {
-      background: rgba(10,12,16,0.7) !important;
-      color: #333 !important;
-      font-size: 10px !important;
-    }
-    .leaflet-control-attribution a { color: #444 !important; }
+    .leaflet-control-zoom a { border-radius: 4px !important; }
   </style>
 </head>
-
 <body>
   <div id="map"></div>
 
@@ -120,10 +76,16 @@
     <hr class="divider"/>
 
     <div class="legend">
-      <span class="chip"><span class="dot" style="background:#7CFF6B;box-shadow:0 0 6px rgba(124,255,107,.5)"></span>Level 2</span>
-      <span class="chip"><span class="dot" style="background:#35B6FF;box-shadow:0 0 6px rgba(53,182,255,.5)"></span>Level 3</span>
       <span class="chip">
-        <span style="display:inline-block;width:16px;height:0;border-top:2px dashed rgba(180,180,180,.4);vertical-align:middle"></span>
+        <span class="dot" style="background:#1a9e3f;box-shadow:0 0 4px rgba(26,158,63,.4)"></span>
+        Level 2
+      </span>
+      <span class="chip">
+        <span class="dot" style="background:#0066cc;box-shadow:0 0 4px rgba(0,102,204,.4)"></span>
+        Level 3
+      </span>
+      <span class="chip">
+        <span style="display:inline-block;width:18px;height:0;border-top:2px dashed #aaa;vertical-align:middle"></span>
         True pos.
       </span>
     </div>
@@ -134,46 +96,40 @@
       <div class="stat"><div class="stat-num stat-p"  id="cnt-ports">—</div><div class="stat-lbl">Ports</div></div>
     </div>
 
-    <div class="hint">
-      Nearby stations are evenly arranged in a circle. Dashed lines show true GPS position.
-    </div>
+    <div class="hint">Nearby stations are evenly arranged in a circle. Dashed lines show true GPS position.</div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
   <script>
-    const CSV_URL    = "South_of_Canal_St.csv";
-    const SPREAD_M   = 70;   // spread radius in metres — tweak if needed
-    const CLUSTER_M  = 80;   // stations within this distance share a circle
+    const CSV_URL   = "South_of_Canal_St.csv";
+    const CLUSTER_M = 80;
 
     // ── Map ───────────────────────────────────────────────────────────────
     const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.0060], 14);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_no_labels/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-    }).addTo(map);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20, pane: 'shadowPane'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     // ── Icons ─────────────────────────────────────────────────────────────
     function boltIcon(level) {
       const isL3  = String(level || "").includes("3");
-      const color = isL3 ? "#35B6FF" : "#7CFF6B";
-      const glow  = isL3 ? "rgba(53,182,255,.6)" : "rgba(124,255,107,.6)";
+      const color = isL3 ? "#0066cc" : "#1a9e3f";
+      const bg    = isL3 ? "rgba(0,102,204,0.12)" : "rgba(26,158,63,0.12)";
+      const glow  = isL3 ? "rgba(0,102,204,.35)" : "rgba(26,158,63,.35)";
       const size  = isL3 ? 30 : 26;
       return L.divIcon({
         className: "",
         html: `<div style="
             width:${size}px;height:${size}px;border-radius:50%;
-            background:rgba(10,12,16,.88);
-            border:1.8px solid ${color};
-            box-shadow:0 0 10px ${glow},inset 0 0 4px rgba(0,0,0,.5);
-            display:flex;align-items:center;justify-content:center;">
-          <svg width="${Math.round(size*.52)}" height="${Math.round(size*.52)}"
+            background:${bg};
+            border:2px solid ${color};
+            box-shadow:0 2px 8px ${glow};
+            display:flex;align-items:center;justify-content:center;
+            backdrop-filter:blur(2px);">
+          <svg width="${Math.round(size*.5)}" height="${Math.round(size*.5)}"
                viewBox="0 0 24 24" fill="${color}">
             <path d="M13 2L3 14h7l-1 8 12-14h-7z"/>
           </svg>
@@ -188,13 +144,13 @@
       className: "",
       html: `<div style="
           width:7px;height:7px;border-radius:50%;
-          background:#ff4d6d;
-          border:1.5px solid rgba(255,255,255,.3);
-          box-shadow:0 0 5px rgba(255,77,109,.7);"></div>`,
+          background:#e63946;
+          border:1.5px solid rgba(255,255,255,.8);
+          box-shadow:0 0 4px rgba(230,57,70,.6);"></div>`,
       iconSize: [7,7], iconAnchor: [3.5,3.5]
     });
 
-    // ── Distance helper ───────────────────────────────────────────────────
+    // ── Distance ──────────────────────────────────────────────────────────
     function distanceMeters(lat1, lng1, lat2, lng2) {
       const dLat = (lat2 - lat1) * 111320;
       const dLng = (lng2 - lng1) * 111320 * Math.cos(lat1 * Math.PI / 180);
@@ -232,12 +188,14 @@
       return clusters;
     }
 
-    // ── Spread position ───────────────────────────────────────────────────
+    // ── Spread — radius scales with cluster size ───────────────────────────
     function spreadPosition(centLat, centLng, index, total) {
       if (total === 1) return [centLat, centLng];
-      const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
-      const dLat  = (SPREAD_M * Math.cos(angle)) / 111320;
-      const dLng  = (SPREAD_M * Math.sin(angle)) / (111320 * Math.cos(centLat * Math.PI / 180));
+      // Each marker gets ~20m of arc space, min 35m, max 120m
+      const radius = Math.min(120, Math.max(35, total * 20 / (2 * Math.PI) * 2));
+      const angle  = (index / total) * 2 * Math.PI - Math.PI / 2;
+      const dLat   = (radius * Math.cos(angle)) / 111320;
+      const dLng   = (radius * Math.sin(angle)) / (111320 * Math.cos(centLat * Math.PI / 180));
       return [centLat + dLat, centLng + dLng];
     }
 
@@ -275,7 +233,7 @@
           if (showLines && moved) {
             L.polyline([[trueLat, trueLng],[fLat, fLng]], {
               weight: 1.5, opacity: 0.5, dashArray: "5 5",
-              color: isL3 ? "#35B6FF" : "#7CFF6B"
+              color: isL3 ? "#0066cc" : "#1a9e3f"
             }).addTo(lineLayer);
 
             L.marker([trueLat, trueLng], { icon: trueDotIcon, interactive: false })
@@ -283,27 +241,27 @@
           }
 
           const popup = `
-            <div style="min-width:210px;line-height:1.45;">
-              <div style="font-weight:700;font-size:13px;margin-bottom:3px;">
+            <div style="min-width:210px;line-height:1.5;font-family:'Segoe UI',system-ui,sans-serif;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:3px;color:#1a1a2e;">
                 ${esc(st.stationName || "Station")}
               </div>
-              <div style="font-size:11.5px;opacity:.7;margin-bottom:8px;">
+              <div style="font-size:11.5px;color:#555;margin-bottom:8px;">
                 ${esc(st.Address || "")}, ${esc(st.City || "")} ${esc(st.postalCode || "")}
               </div>
-              <table style="font-size:11.5px;border-collapse:collapse;width:100%;">
-                <tr><td style="opacity:.55;padding-right:10px;">Charger</td><td>${esc(st["Charger type"] || "")}</td></tr>
-                <tr><td style="opacity:.55;">Model</td>  <td>${esc(st.stationModel || "")}</td></tr>
-                <tr><td style="opacity:.55;">Ports</td>  <td>${esc(String(ports))}</td></tr>
-                <tr><td style="opacity:.55;">Coords</td>
+              <table style="font-size:11.5px;border-collapse:collapse;width:100%;color:#333;">
+                <tr><td style="color:#888;padding-right:10px;padding-bottom:2px;">Charger</td><td>${esc(st["Charger type"] || "")}</td></tr>
+                <tr><td style="color:#888;padding-bottom:2px;">Model</td>  <td>${esc(st.stationModel || "")}</td></tr>
+                <tr><td style="color:#888;padding-bottom:2px;">Ports</td>  <td>${esc(String(ports))}</td></tr>
+                <tr><td style="color:#888;">Coords</td>
                     <td style="font-family:monospace;font-size:10.5px;">
                       ${trueLat.toFixed(6)}, ${trueLng.toFixed(6)}
                     </td></tr>
               </table>
               <div style="margin-top:9px;font-size:11px;display:flex;gap:10px;">
                 <a href="https://www.google.com/maps/dir/?api=1&destination=${trueLat},${trueLng}"
-                   target="_blank" rel="noopener" style="color:#35B6FF;">Google Maps</a>
+                   target="_blank" rel="noopener" style="color:#0066cc;">Google Maps</a>
                 <a href="https://maps.apple.com/?daddr=${trueLat},${trueLng}"
-                   target="_blank" rel="noopener" style="color:#35B6FF;">Apple Maps</a>
+                   target="_blank" rel="noopener" style="color:#0066cc;">Apple Maps</a>
               </div>
             </div>`;
 
@@ -324,7 +282,7 @@
         .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     }
 
-    // ── Load CSV ──────────────────────────────────────────────────────────
+    // ── Load ──────────────────────────────────────────────────────────────
     async function loadCSV() {
       const res = await fetch(CSV_URL, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
