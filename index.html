@@ -2,31 +2,106 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Lower Manhattan Chargers (Always Spider)</title>
+  <title>Lower Manhattan EV Chargers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body { height: 100%; margin: 0; }
+    html, body { height: 100%; margin: 0; background: #0a0c10; }
     #map { height: 100%; width: 100%; }
 
-    .panel{
-      position:absolute; top:12px; left:12px; z-index:9999;
-      background: rgba(18,18,22,.92);
-      color:#fff; padding:10px 12px; border-radius:12px;
-      box-shadow: 0 10px 26px rgba(0,0,0,.35);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      width: 330px;
+    .leaflet-tile { filter: brightness(0.82) saturate(0.55) hue-rotate(190deg); }
+
+    .panel {
+      position: absolute; top: 14px; left: 14px; z-index: 9999;
+      background: rgba(12,15,21,0.93);
+      border: 1px solid rgba(255,255,255,0.07);
+      color: #c8d6e5;
+      padding: 14px 16px;
+      border-radius: 8px;
+      box-shadow: 0 12px 36px rgba(0,0,0,.55);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      width: 256px;
+      backdrop-filter: blur(8px);
     }
-    .panel h3{ margin:0 0 8px 0; font-size:14px; font-weight:800; letter-spacing:.2px; }
-    .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; }
-    label{ font-size:12px; opacity:.95; }
-    input[type="range"]{ width: 170px; }
-    .hint{ font-size:11px; opacity:.75; line-height:1.35; margin-top:6px; }
-    .legend{ display:flex; gap:10px; margin-top:8px; font-size:12px; opacity:.95; flex-wrap:wrap; }
-    .chip{ display:flex; align-items:center; gap:6px; }
-    .dot{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .panel h3 {
+      margin: 0 0 2px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #fff;
+    }
+    .panel .sub {
+      font-size: 10.5px;
+      opacity: .45;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin: 10px 0;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 8px 0;
+    }
+    label { font-size: 12px; opacity: .85; }
+    input[type="checkbox"] { accent-color: #00d4ff; }
+    .btn {
+      cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px; padding: 5px 10px;
+      background: rgba(255,255,255,0.06);
+      color: #c8d6e5; font-size: 12px;
+      transition: background .15s;
+    }
+    .btn:hover { background: rgba(255,255,255,0.12); }
+
+    .legend { display: flex; gap: 14px; margin-top: 4px; }
+    .chip { display: flex; align-items: center; gap: 6px; font-size: 11.5px; opacity: .9; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; }
+
+    .stats { display: flex; gap: 8px; margin-top: 10px; }
+    .stat {
+      flex: 1; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 6px; padding: 7px 8px; text-align: center;
+    }
+    .stat-num { font-size: 18px; font-weight: 700; line-height: 1; }
+    .stat-lbl { font-size: 9.5px; opacity: .45; text-transform: uppercase; letter-spacing: .1em; margin-top: 2px; }
+    .stat-l2  { color: #7CFF6B; text-shadow: 0 0 10px rgba(124,255,107,.4); }
+    .stat-l3  { color: #35B6FF; text-shadow: 0 0 10px rgba(53,182,255,.4); }
+    .stat-p   { color: #ffd60a; text-shadow: 0 0 10px rgba(255,214,10,.4); }
+
+    .hint { font-size: 10.5px; opacity: .38; line-height: 1.5; margin-top: 10px; }
+
+    .leaflet-popup-content-wrapper {
+      background: rgba(12,15,21,0.97) !important;
+      border: 1px solid rgba(255,255,255,0.09) !important;
+      border-radius: 8px !important;
+      box-shadow: 0 8px 28px rgba(0,0,0,.6) !important;
+      color: #c8d6e5 !important;
+      font-family: 'Segoe UI', system-ui, sans-serif !important;
+    }
+    .leaflet-popup-tip { background: rgba(12,15,21,0.97) !important; }
+    .leaflet-popup-close-button { color: #556070 !important; }
+    .leaflet-control-zoom a {
+      background: rgba(12,15,21,0.92) !important;
+      color: #c8d6e5 !important;
+      border-color: rgba(255,255,255,0.08) !important;
+    }
+    .leaflet-control-zoom a:hover { background: rgba(255,255,255,0.08) !important; }
+    .leaflet-control-attribution {
+      background: rgba(10,12,16,0.7) !important;
+      color: #333 !important;
+      font-size: 10px !important;
+    }
+    .leaflet-control-attribution a { color: #444 !important; }
   </style>
 </head>
 
@@ -34,254 +109,250 @@
   <div id="map"></div>
 
   <div class="panel">
-    <h3>Lower Manhattan Stations</h3>
+    <h3>⚡ Lower Manhattan EV Chargers</h3>
+    <div class="sub">NYC Fleet · South of Canal St</div>
 
     <div class="row">
-      <label for="radius">Circle radius</label>
-      <input id="radius" type="range" min="10" max="140" value="60" />
+      <label><input id="showLines" type="checkbox" checked /> Show connector lines</label>
+      <button class="btn" id="recenter">Recenter</button>
     </div>
 
-    <div class="row">
-      <label for="group">Grouping size</label>
-      <input id="group" type="range" min="3" max="6" value="5" />
-    </div>
-
-    <div class="row">
-      <label><input id="showLines" type="checkbox" checked /> Show legs</label>
-      <button id="recenter" style="cursor:pointer;border:0;border-radius:10px;padding:6px 10px;background:#2c2c35;color:#fff;">
-        Recenter
-      </button>
-    </div>
+    <hr class="divider"/>
 
     <div class="legend">
-      <span class="chip"><span class="dot" style="background:#7CFF6B;"></span>Level 2</span>
-      <span class="chip"><span class="dot" style="background:#35B6FF;"></span>Level 3</span>
-      <span class="chip"><span class="dot" style="background:#fff; opacity:.35;"></span>True point</span>
+      <span class="chip"><span class="dot" style="background:#7CFF6B;box-shadow:0 0 6px rgba(124,255,107,.5)"></span>Level 2</span>
+      <span class="chip"><span class="dot" style="background:#35B6FF;box-shadow:0 0 6px rgba(53,182,255,.5)"></span>Level 3</span>
+      <span class="chip">
+        <span style="display:inline-block;width:16px;height:0;border-top:2px dashed rgba(180,180,180,.4);vertical-align:middle"></span>
+        True pos.
+      </span>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-num stat-l2" id="cnt-l2">—</div><div class="stat-lbl">Lvl 2</div></div>
+      <div class="stat"><div class="stat-num stat-l3" id="cnt-l3">—</div><div class="stat-lbl">Lvl 3</div></div>
+      <div class="stat"><div class="stat-num stat-p"  id="cnt-ports">—</div><div class="stat-lbl">Ports</div></div>
     </div>
 
     <div class="hint">
-      Chargers are always shown as circles around their shared “general location.”
-      Grouping size controls how strictly locations are grouped.
+      Nearby stations are evenly arranged in a circle. Dashed lines show true GPS position.
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <script>
-    // ====== CONFIG ======
-    const CSV_URL = "South_of_Canal_St.csv"; // same folder as index.html
-    // ====================
+    const CSV_URL    = "South_of_Canal_St.csv";
+    const SPREAD_M   = 70;   // spread radius in metres — tweak if needed
+    const CLUSTER_M  = 80;   // stations within this distance share a circle
 
-    const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.0060], 13);
+    // ── Map ───────────────────────────────────────────────────────────────
+    const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.0060], 14);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_no_labels/{z}/{x}/{y}{r}.png', {
       maxZoom: 20,
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
     }).addTo(map);
 
-    // --- Bolt icon (divIcon) ---
-    function boltIcon(level){
-      const isL3 = String(level || "").toLowerCase().includes("3");
-      const glow = isL3 ? "rgba(53,182,255,.55)" : "rgba(124,255,107,.55)";
-      const ring = isL3 ? "#35B6FF" : "#7CFF6B";
-      const fill = "rgba(18,18,22,.92)";
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20, pane: 'shadowPane'
+    }).addTo(map);
 
-      const html = `
-        <div style="
-          width:28px;height:28px;border-radius:999px;
-          background:${fill};
-          border:2px solid ${ring};
-          box-shadow: 0 0 12px ${glow};
-          display:flex;align-items:center;justify-content:center;
-        ">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="${ring}" xmlns="http://www.w3.org/2000/svg">
-            <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
-          </svg>
-        </div>
-      `;
+    // ── Icons ─────────────────────────────────────────────────────────────
+    function boltIcon(level) {
+      const isL3  = String(level || "").includes("3");
+      const color = isL3 ? "#35B6FF" : "#7CFF6B";
+      const glow  = isL3 ? "rgba(53,182,255,.6)" : "rgba(124,255,107,.6)";
+      const size  = isL3 ? 30 : 26;
       return L.divIcon({
         className: "",
-        html,
-        iconSize: [28,28],
-        iconAnchor: [14,14],
-        popupAnchor: [0,-12]
+        html: `<div style="
+            width:${size}px;height:${size}px;border-radius:50%;
+            background:rgba(10,12,16,.88);
+            border:1.8px solid ${color};
+            box-shadow:0 0 10px ${glow},inset 0 0 4px rgba(0,0,0,.5);
+            display:flex;align-items:center;justify-content:center;">
+          <svg width="${Math.round(size*.52)}" height="${Math.round(size*.52)}"
+               viewBox="0 0 24 24" fill="${color}">
+            <path d="M13 2L3 14h7l-1 8 12-14h-7z"/>
+          </svg>
+        </div>`,
+        iconSize:    [size, size],
+        iconAnchor:  [size/2, size/2],
+        popupAnchor: [0, -(size/2+6)]
       });
     }
 
-    // --- CSV parser ---
-    function parseCSV(text){
-      const rows = [];
-      let row = [];
-      let cur = "";
-      let inQuotes = false;
+    const trueDotIcon = L.divIcon({
+      className: "",
+      html: `<div style="
+          width:7px;height:7px;border-radius:50%;
+          background:#ff4d6d;
+          border:1.5px solid rgba(255,255,255,.3);
+          box-shadow:0 0 5px rgba(255,77,109,.7);"></div>`,
+      iconSize: [7,7], iconAnchor: [3.5,3.5]
+    });
 
-      for (let i=0;i<text.length;i++){
-        const c = text[i];
-        const n = text[i+1];
-
-        if (c === '"' && inQuotes && n === '"'){ cur += '"'; i++; continue; }
-        if (c === '"'){ inQuotes = !inQuotes; continue; }
-
-        if (!inQuotes && c === ","){ row.push(cur); cur = ""; continue; }
-        if (!inQuotes && (c === "\n" || c === "\r")){
-          if (c === "\r" && n === "\n") i++;
-          row.push(cur); cur = "";
-          if (row.some(v => String(v).trim() !== "")) rows.push(row);
-          row = [];
-          continue;
-        }
-        cur += c;
-      }
-      if (cur.length || row.length){
-        row.push(cur);
-        if (row.some(v => String(v).trim() !== "")) rows.push(row);
-      }
-
-      if (!rows.length) return [];
-      const header = rows[0].map(h => h.trim());
-      return rows.slice(1).map(r => {
-        const obj = {};
-        header.forEach((h, idx) => obj[h] = (r[idx] ?? "").trim());
-        return obj;
-      });
+    // ── Distance helper ───────────────────────────────────────────────────
+    function distanceMeters(lat1, lng1, lat2, lng2) {
+      const dLat = (lat2 - lat1) * 111320;
+      const dLng = (lng2 - lng1) * 111320 * Math.cos(lat1 * Math.PI / 180);
+      return Math.hypot(dLat, dLng);
     }
 
-    function escapeHtml(str){
-      return String(str ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
+    // ── Cluster by proximity ──────────────────────────────────────────────
+    function clusterStations(data) {
+      const clusters = [];
+      const assigned = new Set();
 
-    function metersToOffsets(lat, meters, angle){
-      const dLat = (meters * Math.cos(angle)) / 111320;
-      const dLng = (meters * Math.sin(angle)) / (111320 * Math.cos(lat * Math.PI/180));
-      return { dLat, dLng };
-    }
+      data.forEach((st, i) => {
+        if (assigned.has(i)) return;
+        const lat = parseFloat(st.Lat);
+        const lng = parseFloat(st.Long);
+        if (!isFinite(lat) || !isFinite(lng)) return;
 
-    // Layers
-    const markerLayer = L.layerGroup().addTo(map);
-    const lineLayer = L.layerGroup().addTo(map);
-    const trueLayer = L.layerGroup().addTo(map);
+        const cluster = [st];
+        assigned.add(i);
 
-    let stationData = [];
-    let trueBounds = null;
-
-    function clearAll(){
-      markerLayer.clearLayers();
-      lineLayer.clearLayers();
-      trueLayer.clearLayers();
-    }
-
-    function groupByArea(data, decimals){
-      const groups = {};
-      data.forEach(st => {
-        const lat = Number(st.Lat);
-        const lng = Number(st.Long);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        const key = lat.toFixed(decimals) + "," + lng.toFixed(decimals);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(st);
-      });
-      return groups;
-    }
-
-    function render(){
-      clearAll();
-
-      const radiusMeters = Number(document.getElementById("radius").value || 60);
-      const decimals = Number(document.getElementById("group").value || 5);
-      const showLines = document.getElementById("showLines").checked;
-
-      const groups = groupByArea(stationData, decimals);
-
-      Object.values(groups).forEach(group => {
-        const baseLat = Number(group[0].Lat);
-        const baseLng = Number(group[0].Long);
-        const count = group.length;
-
-        // show a subtle true-point dot
-        L.circleMarker([baseLat, baseLng], {
-          radius: 5, weight: 2, opacity: 0.85, fillOpacity: 0.15
-        }).addTo(trueLayer);
-
-        group.forEach((st, i) => {
-          let finalLat = baseLat;
-          let finalLng = baseLng;
-
-          if (count > 1){
-            const angle = (i / count) * 2 * Math.PI;
-            const { dLat, dLng } = metersToOffsets(baseLat, radiusMeters, angle);
-            finalLat += dLat;
-            finalLng += dLng;
-          }
-
-          const ctype = st["Charger type"] || st["Charger type (legend)"] || "";
-          const icon = boltIcon(ctype);
-
-          const marker = L.marker([finalLat, finalLng], { icon }).addTo(markerLayer);
-
-          const popupHtml = `
-            <div style="font-family:system-ui,Segoe UI,Roboto,Arial;min-width:220px;">
-              <div style="font-weight:800;margin-bottom:4px;">${escapeHtml(st.stationName || "Station")}</div>
-              <div style="opacity:.9;margin-bottom:6px;">
-                ${escapeHtml(st.Address || "")}<br/>
-                ${escapeHtml(st.City || "")}, ${escapeHtml(st.State || "")} ${escapeHtml(st.postalCode || "")}
-              </div>
-              <div style="font-size:12px;opacity:.9;line-height:1.35;">
-                <b>Charger:</b> ${escapeHtml(ctype)}<br/>
-                <b>Model:</b> ${escapeHtml(st.stationModel || "")}<br/>
-                <b>Ports:</b> ${escapeHtml(String(st.ports_total || ""))}
-              </div>
-              <div style="margin-top:8px;font-size:12px;">
-                <a href="https://www.google.com/maps/dir/?api=1&destination=${Number(st.Lat)},${Number(st.Long)}" target="_blank" rel="noopener noreferrer">Directions (Google)</a>
-                &nbsp;|&nbsp;
-                <a href="https://maps.apple.com/?daddr=${Number(st.Lat)},${Number(st.Long)}" target="_blank" rel="noopener noreferrer">Directions (Apple)</a>
-              </div>
-            </div>
-          `;
-          marker.bindPopup(popupHtml);
-
-          if (showLines && count > 1){
-            L.polyline([[baseLat, baseLng],[finalLat, finalLng]], {
-              weight: 2,
-              opacity: 0.75
-            }).addTo(lineLayer);
+        data.forEach((other, j) => {
+          if (assigned.has(j)) return;
+          const oLat = parseFloat(other.Lat);
+          const oLng = parseFloat(other.Long);
+          if (!isFinite(oLat) || !isFinite(oLng)) return;
+          if (distanceMeters(lat, lng, oLat, oLng) <= CLUSTER_M) {
+            cluster.push(other);
+            assigned.add(j);
           }
         });
+
+        clusters.push(cluster);
       });
+
+      return clusters;
     }
 
-    async function loadCSV(){
+    // ── Spread position ───────────────────────────────────────────────────
+    function spreadPosition(centLat, centLng, index, total) {
+      if (total === 1) return [centLat, centLng];
+      const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
+      const dLat  = (SPREAD_M * Math.cos(angle)) / 111320;
+      const dLng  = (SPREAD_M * Math.sin(angle)) / (111320 * Math.cos(centLat * Math.PI / 180));
+      return [centLat + dLat, centLng + dLng];
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────
+    const markerLayer = L.layerGroup().addTo(map);
+    const lineLayer   = L.layerGroup().addTo(map);
+    let   stationData = [];
+    let   trueBounds  = null;
+
+    function render() {
+      markerLayer.clearLayers();
+      lineLayer.clearLayers();
+
+      const showLines = document.getElementById("showLines").checked;
+      const clusters  = clusterStations(stationData);
+
+      let cntL2 = 0, cntL3 = 0, totalPorts = 0;
+
+      clusters.forEach(cluster => {
+        const centLat = cluster.reduce((s,st) => s + parseFloat(st.Lat),  0) / cluster.length;
+        const centLng = cluster.reduce((s,st) => s + parseFloat(st.Long), 0) / cluster.length;
+
+        cluster.forEach((st, i) => {
+          const trueLat = parseFloat(st.Lat);
+          const trueLng = parseFloat(st.Long);
+          const isL3    = String(st["Charger type"] || "").includes("3");
+          const ports   = parseInt(st.ports_total) || 0;
+
+          if (isL3) cntL3++; else cntL2++;
+          totalPorts += ports;
+
+          const [fLat, fLng] = spreadPosition(centLat, centLng, i, cluster.length);
+          const moved = Math.hypot(fLat - trueLat, fLng - trueLng) > 1e-8;
+
+          if (showLines && moved) {
+            L.polyline([[trueLat, trueLng],[fLat, fLng]], {
+              weight: 1.5, opacity: 0.5, dashArray: "5 5",
+              color: isL3 ? "#35B6FF" : "#7CFF6B"
+            }).addTo(lineLayer);
+
+            L.marker([trueLat, trueLng], { icon: trueDotIcon, interactive: false })
+              .addTo(lineLayer);
+          }
+
+          const popup = `
+            <div style="min-width:210px;line-height:1.45;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:3px;">
+                ${esc(st.stationName || "Station")}
+              </div>
+              <div style="font-size:11.5px;opacity:.7;margin-bottom:8px;">
+                ${esc(st.Address || "")}, ${esc(st.City || "")} ${esc(st.postalCode || "")}
+              </div>
+              <table style="font-size:11.5px;border-collapse:collapse;width:100%;">
+                <tr><td style="opacity:.55;padding-right:10px;">Charger</td><td>${esc(st["Charger type"] || "")}</td></tr>
+                <tr><td style="opacity:.55;">Model</td>  <td>${esc(st.stationModel || "")}</td></tr>
+                <tr><td style="opacity:.55;">Ports</td>  <td>${esc(String(ports))}</td></tr>
+                <tr><td style="opacity:.55;">Coords</td>
+                    <td style="font-family:monospace;font-size:10.5px;">
+                      ${trueLat.toFixed(6)}, ${trueLng.toFixed(6)}
+                    </td></tr>
+              </table>
+              <div style="margin-top:9px;font-size:11px;display:flex;gap:10px;">
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${trueLat},${trueLng}"
+                   target="_blank" rel="noopener" style="color:#35B6FF;">Google Maps</a>
+                <a href="https://maps.apple.com/?daddr=${trueLat},${trueLng}"
+                   target="_blank" rel="noopener" style="color:#35B6FF;">Apple Maps</a>
+              </div>
+            </div>`;
+
+          L.marker([fLat, fLng], { icon: boltIcon(st["Charger type"]) })
+            .addTo(markerLayer)
+            .bindPopup(popup, { maxWidth: 260 });
+        });
+      });
+
+      document.getElementById("cnt-l2").textContent    = cntL2;
+      document.getElementById("cnt-l3").textContent    = cntL3;
+      document.getElementById("cnt-ports").textContent = totalPorts;
+    }
+
+    function esc(str) {
+      return String(str ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    // ── Load CSV ──────────────────────────────────────────────────────────
+    async function loadCSV() {
       const res = await fetch(CSV_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(`Failed to fetch CSV: ${res.status} ${res.statusText}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
-      stationData = parseCSV(text);
+
+      const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+      stationData = result.data;
 
       const pts = stationData
-        .map(s => [Number(s.Lat), Number(s.Long)])
-        .filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+        .map(s => [parseFloat(s.Lat), parseFloat(s.Long)])
+        .filter(p => isFinite(p[0]) && isFinite(p[1]));
 
-      if (pts.length){
+      if (pts.length) {
         trueBounds = L.latLngBounds(pts);
-        map.fitBounds(trueBounds.pad(0.18));
+        map.fitBounds(trueBounds.pad(0.15));
       }
 
       render();
     }
 
-    document.getElementById("radius").addEventListener("input", render);
-    document.getElementById("group").addEventListener("input", render);
     document.getElementById("showLines").addEventListener("change", render);
     document.getElementById("recenter").addEventListener("click", () => {
-      if (trueBounds) map.fitBounds(trueBounds.pad(0.18));
+      if (trueBounds) map.fitBounds(trueBounds.pad(0.15));
     });
 
     loadCSV().catch(err => {
       console.error(err);
-      alert("Could not load South_of_Canal_St.csv. Make sure it is in the same folder as index.html and GitHub Pages is enabled.");
+      alert("Could not load " + CSV_URL + "\n\nMake sure it sits in the same folder as index.html.");
     });
   </script>
 </body>
