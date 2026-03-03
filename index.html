@@ -82,8 +82,8 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // CSV (root of GitHub Pages)
-    const CSV_URL = 'https://flashe24v.github.io/South_of_Canal_St.csv';
+    // CSV (GitHub Pages, repo is FlashE24V)
+    const CSV_URL = 'https://flashe24v.github.io/FlashE24V/South_of_Canal_St.csv';
 
     // Layers
     const markerLayer = L.layerGroup().addTo(map);
@@ -100,9 +100,9 @@
     function metersToLatDeg(m) { return m / 111320; }
     function metersToLngDeg(m, atLat) { return m / (111320 * Math.cos(atLat * Math.PI / 180)); }
 
-    // Group "same spot" more aggressively so they fan out more
+    // Group close points so they fan out more
     function keyFor(lat, lng) {
-      const p = 4; // 4-decimal grouping (~10m-ish)
+      const p = 4; // ~10m-ish grouping
       return `${lat.toFixed(p)},${lng.toFixed(p)}`;
     }
 
@@ -318,7 +318,7 @@
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds().pad(0.15));
       } else if (zoomToMarkers) {
-        // if nothing matches, keep map where it is
+        // keep current view
       }
     }
 
