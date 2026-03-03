@@ -74,49 +74,48 @@
   <div id="map"></div>
 
   <script>
-    // --- View: Lower Manhattan (rough) ---
-    const lowerManhattanBounds = L.latLngBounds(
-      [40.6970, -74.0220],
-      [40.7245, -73.9900]
-    );
-
+    // Map init
     const map = L.map('map', { preferCanvas: true });
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    map.fitBounds(lowerManhattanBounds, { padding: [20, 20] });
-
-    // --- CSV (root of GitHub Pages) ---
+    // CSV (root of GitHub Pages)
     const CSV_URL = 'https://flashe24v.github.io/South_of_Canal_St.csv';
 
-    // --- Layers ---
+    // Layers
     const markerLayer = L.layerGroup().addTo(map);
-    const lineLayer = L.layerGroup().addTo(map);
+    const lineLayer   = L.layerGroup().addTo(map);
 
+    // Data
     let allRows = [];
 
-    // --- Helpers ---
+    // Helpers
     function norm(v) {
       return String(v || '').toLowerCase().replace(/\s+/g,' ').trim();
     }
 
-    // Spread + leader lines
-    function keyFor(lat, lng) {
-      const p = 5;
-      return `${lat.toFixed(p)},${lng.toFixed(p)}`;
-    }
     function metersToLatDeg(m) { return m / 111320; }
     function metersToLngDeg(m, atLat) { return m / (111320 * Math.cos(atLat * Math.PI / 180)); }
 
+    // Group "same spot" more aggressively so they fan out more
+    function keyFor(lat, lng) {
+      const p = 4; // 4-decimal grouping (~10m-ish)
+      return `${lat.toFixed(p)},${lng.toFixed(p)}`;
+    }
+
+    // Bigger spacing + leader lines back to the true coordinate
     function offsetPoint(lat, lng, indexInBucket) {
       if (indexInBucket === 0) return [lat, lng];
+
       const angle = (indexInBucket * 137.5) * Math.PI / 180; // golden angle
-      // More spacing than before:
-      const radiusMeters = 18 + (Math.floor(indexInBucket / 6) * 10); // 18m, 28m, 38m...
+      const radiusMeters = 35 + (Math.floor(indexInBucket / 8) * 15); // wide fan-out
+
       const dLat = metersToLatDeg(radiusMeters) * Math.sin(angle);
       const dLng = metersToLngDeg(radiusMeters, lat) * Math.cos(angle);
+
       return [lat + dLat, lng + dLng];
     }
 
@@ -154,7 +153,7 @@
       });
     }
 
-    // --- Filter state ---
+    // Filter state
     const state = { showL2: true, showL3: true, search: '' };
 
     function isLevel2(r) {
@@ -185,7 +184,7 @@
       return true;
     }
 
-    // --- Robust filter control (no setTimeout wiring) ---
+    // Filter control UI
     const FilterControl = L.Control.extend({
       options: { position: 'topright' },
       onAdd: function() {
@@ -226,7 +225,6 @@
         actions.appendChild(btnApply);
         actions.appendChild(btnReset);
 
-        // Stop clicks from moving the map
         L.DomEvent.disableClickPropagation(div);
         L.DomEvent.disableScrollPropagation(div);
 
@@ -248,7 +246,7 @@
           render(true);
         });
 
-        // Optional: live update when toggling checkboxes
+        // live update
         chkL2.addEventListener('change', applyNow);
         chkL3.addEventListener('change', applyNow);
         txt.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyNow(); });
@@ -256,11 +254,10 @@
         return div;
       }
     });
-
     map.addControl(new FilterControl());
 
-    // --- Render ---
-    function render(resetToBounds=false) {
+    // Render
+    function render(zoomToMarkers=false) {
       markerLayer.clearLayers();
       lineLayer.clearLayers();
 
@@ -272,9 +269,6 @@
         const lng = parseFloat(r['Long']);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-        // Keep to your south-of-canal-ish bounds (since CSV already is, but safe)
-        if (!lowerManhattanBounds.contains([lat, lng])) return;
-
         if (!rowMatchesFilters(r)) return;
 
         const key = keyFor(lat, lng);
@@ -283,13 +277,11 @@
 
         const [lat2, lng2] = offsetPoint(lat, lng, count);
 
-        // Draw leader line if offset occurred
+        // leader line + true dot
         if (count > 0) {
-          L.polyline([[lat, lng], [lat2, lng2]], {
-            weight: 2,
-            opacity: 0.65
-          }).addTo(lineLayer);
+          L.polyline([[lat, lng], [lat2, lng2]], { weight: 2, opacity: 0.65 }).addTo(lineLayer);
         }
+        L.circleMarker([lat, lng], { radius: 3, opacity: 0.9, fillOpacity: 0.9 }).addTo(lineLayer);
 
         const name = r['stationName'] || 'Station';
         const address = r['Address'] || '';
@@ -315,19 +307,22 @@
         `;
 
         const icon = boltIcon(chargerType, ports);
-        const m = L.marker([lat2, lng2], { icon }).addTo(markerLayer);
+
+        // zIndexOffset helps ensure "last one" (e.g., REVEL) is visible/clickable
+        const m = L.marker([lat2, lng2], { icon, zIndexOffset: 1000 + count }).addTo(markerLayer);
         m.bindPopup(popup);
         markers.push(m);
       });
 
       if (markers.length) {
-        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
-      } else if (resetToBounds) {
-        map.fitBounds(lowerManhattanBounds, { padding: [20, 20] });
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.15));
+      } else if (zoomToMarkers) {
+        // if nothing matches, keep map where it is
       }
     }
 
-    // --- Load CSV ---
+    // Load CSV
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
