@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Lower Manhattan Stations (Spider Circle)</title>
+  <title>Lower Manhattan Chargers (Always Spider)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -17,25 +17,16 @@
       color:#fff; padding:10px 12px; border-radius:12px;
       box-shadow: 0 10px 26px rgba(0,0,0,.35);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      width: 310px;
+      width: 330px;
     }
     .panel h3{ margin:0 0 8px 0; font-size:14px; font-weight:800; letter-spacing:.2px; }
     .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; }
     label{ font-size:12px; opacity:.95; }
-    input[type="range"]{ width: 160px; }
+    input[type="range"]{ width: 170px; }
     .hint{ font-size:11px; opacity:.75; line-height:1.35; margin-top:6px; }
-    .legend{ display:flex; gap:10px; margin-top:8px; font-size:12px; opacity:.95; }
+    .legend{ display:flex; gap:10px; margin-top:8px; font-size:12px; opacity:.95; flex-wrap:wrap; }
     .chip{ display:flex; align-items:center; gap:6px; }
     .dot{ width:10px; height:10px; border-radius:999px; display:inline-block; }
-
-    .siteBadge{
-      display:flex; align-items:center; justify-content:center;
-      width:30px; height:30px; border-radius:999px;
-      background: rgba(18,18,22,.92);
-      border: 2px solid rgba(255,255,255,.18);
-      box-shadow: 0 0 14px rgba(255,255,255,.12);
-      font-weight:800; font-size:12px; color:#fff;
-    }
   </style>
 </head>
 
@@ -47,11 +38,16 @@
 
     <div class="row">
       <label for="radius">Circle radius</label>
-      <input id="radius" type="range" min="10" max="120" value="55" />
+      <input id="radius" type="range" min="10" max="140" value="60" />
     </div>
 
     <div class="row">
-      <label><input id="showLines" type="checkbox" checked /> Show position lines</label>
+      <label for="group">Grouping size</label>
+      <input id="group" type="range" min="3" max="6" value="5" />
+    </div>
+
+    <div class="row">
+      <label><input id="showLines" type="checkbox" checked /> Show legs</label>
       <button id="recenter" style="cursor:pointer;border:0;border-radius:10px;padding:6px 10px;background:#2c2c35;color:#fff;">
         Recenter
       </button>
@@ -60,12 +56,12 @@
     <div class="legend">
       <span class="chip"><span class="dot" style="background:#7CFF6B;"></span>Level 2</span>
       <span class="chip"><span class="dot" style="background:#35B6FF;"></span>Level 3</span>
-      <span class="chip"><span class="dot" style="background:#fff; opacity:.5;"></span>Site</span>
+      <span class="chip"><span class="dot" style="background:#fff; opacity:.35;"></span>True point</span>
     </div>
 
     <div class="hint">
-      Click a site marker to expand chargers into a circle (no clustering).
-      Change circle radius if it looks too tight.
+      Chargers are always shown as circles around their shared “general location.”
+      Grouping size controls how strictly locations are grouped.
     </div>
   </div>
 
@@ -73,8 +69,7 @@
 
   <script>
     // ====== CONFIG ======
-    const CSV_URL = "South_of_Canal_St.csv";   // same folder as index.html
-    const GROUP_DECIMALS = 5;                  // 5 = tight grouping; try 4 for "general area"
+    const CSV_URL = "South_of_Canal_St.csv"; // same folder as index.html
     // ====================
 
     const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.0060], 13);
@@ -84,7 +79,7 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // --- Bolt icons (divIcon) ---
+    // --- Bolt icon (divIcon) ---
     function boltIcon(level){
       const isL3 = String(level || "").toLowerCase().includes("3");
       const glow = isL3 ? "rgba(53,182,255,.55)" : "rgba(124,255,107,.55)";
@@ -98,7 +93,6 @@
           border:2px solid ${ring};
           box-shadow: 0 0 12px ${glow};
           display:flex;align-items:center;justify-content:center;
-          transform: translateZ(0);
         ">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="${ring}" xmlns="http://www.w3.org/2000/svg">
             <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
@@ -114,18 +108,7 @@
       });
     }
 
-    function siteIcon(count){
-      const html = `<div class="siteBadge">${count}</div>`;
-      return L.divIcon({
-        className: "",
-        html,
-        iconSize: [30,30],
-        iconAnchor: [15,15],
-        popupAnchor: [0,-12]
-      });
-    }
-
-    // --- Basic CSV parser (handles commas + quotes) ---
+    // --- CSV parser ---
     function parseCSV(text){
       const rows = [];
       let row = [];
@@ -139,9 +122,7 @@
         if (c === '"' && inQuotes && n === '"'){ cur += '"'; i++; continue; }
         if (c === '"'){ inQuotes = !inQuotes; continue; }
 
-        if (!inQuotes && (c === ",")){
-          row.push(cur); cur = ""; continue;
-        }
+        if (!inQuotes && c === ","){ row.push(cur); cur = ""; continue; }
         if (!inQuotes && (c === "\n" || c === "\r")){
           if (c === "\r" && n === "\n") i++;
           row.push(cur); cur = "";
@@ -174,146 +155,102 @@
         .replaceAll("'","&#039;");
     }
 
-    function metersToLatLngOffsets(lat, meters, angleRad){
-      const dLat = (meters * Math.cos(angleRad)) / 111320;
-      const dLng = (meters * Math.sin(angleRad)) / (111320 * Math.cos(lat * Math.PI/180));
+    function metersToOffsets(lat, meters, angle){
+      const dLat = (meters * Math.cos(angle)) / 111320;
+      const dLng = (meters * Math.sin(angle)) / (111320 * Math.cos(lat * Math.PI/180));
       return { dLat, dLng };
     }
 
-    function groupByArea(data){
+    // Layers
+    const markerLayer = L.layerGroup().addTo(map);
+    const lineLayer = L.layerGroup().addTo(map);
+    const trueLayer = L.layerGroup().addTo(map);
+
+    let stationData = [];
+    let trueBounds = null;
+
+    function clearAll(){
+      markerLayer.clearLayers();
+      lineLayer.clearLayers();
+      trueLayer.clearLayers();
+    }
+
+    function groupByArea(data, decimals){
       const groups = {};
       data.forEach(st => {
         const lat = Number(st.Lat);
         const lng = Number(st.Long);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        const key = lat.toFixed(GROUP_DECIMALS) + "," + lng.toFixed(GROUP_DECIMALS);
+        const key = lat.toFixed(decimals) + "," + lng.toFixed(decimals);
         if (!groups[key]) groups[key] = [];
         groups[key].push(st);
       });
       return groups;
     }
 
-    // Layers
-    const siteLayer = L.layerGroup().addTo(map);
-    const expandedLayer = L.layerGroup().addTo(map);
-    const lineLayer = L.layerGroup().addTo(map);
+    function render(){
+      clearAll();
 
-    let stationData = [];
-    let trueBounds = null;
+      const radiusMeters = Number(document.getElementById("radius").value || 60);
+      const decimals = Number(document.getElementById("group").value || 5);
+      const showLines = document.getElementById("showLines").checked;
 
-    let expandedKey = null; // which site is expanded right now
+      const groups = groupByArea(stationData, decimals);
 
-    function clearExpanded(){
-      expandedLayer.clearLayers();
-      lineLayer.clearLayers();
-      expandedKey = null;
-    }
-
-    function buildSiteMarkers(){
-      siteLayer.clearLayers();
-      clearExpanded();
-
-      const groups = groupByArea(stationData);
-
-      Object.entries(groups).forEach(([key, group]) => {
+      Object.values(groups).forEach(group => {
         const baseLat = Number(group[0].Lat);
         const baseLng = Number(group[0].Long);
+        const count = group.length;
 
-        const m = L.marker([baseLat, baseLng], { icon: siteIcon(group.length) }).addTo(siteLayer);
+        // show a subtle true-point dot
+        L.circleMarker([baseLat, baseLng], {
+          radius: 5, weight: 2, opacity: 0.85, fillOpacity: 0.15
+        }).addTo(trueLayer);
 
-        const sample = group[0];
-        const sitePopup = `
-          <div style="font-family:system-ui,Segoe UI,Roboto,Arial;min-width:220px;">
-            <div style="font-weight:800;margin-bottom:4px;">Site (${group.length} chargers)</div>
-            <div style="opacity:.9;margin-bottom:6px;">
-              ${escapeHtml(sample.Address || "")}<br/>
-              ${escapeHtml(sample.City || "")}, ${escapeHtml(sample.State || "")} ${escapeHtml(sample.postalCode || "")}
-            </div>
-            <div style="font-size:12px;opacity:.9;">Click marker to expand into circle.</div>
-          </div>
-        `;
-        m.bindPopup(sitePopup);
+        group.forEach((st, i) => {
+          let finalLat = baseLat;
+          let finalLng = baseLng;
 
-        m.on("click", () => {
-          // toggle expand/collapse
-          if (expandedKey === key){
-            clearExpanded();
-            return;
+          if (count > 1){
+            const angle = (i / count) * 2 * Math.PI;
+            const { dLat, dLng } = metersToOffsets(baseLat, radiusMeters, angle);
+            finalLat += dLat;
+            finalLng += dLng;
           }
-          expandSite(key, group, baseLat, baseLng);
+
+          const ctype = st["Charger type"] || st["Charger type (legend)"] || "";
+          const icon = boltIcon(ctype);
+
+          const marker = L.marker([finalLat, finalLng], { icon }).addTo(markerLayer);
+
+          const popupHtml = `
+            <div style="font-family:system-ui,Segoe UI,Roboto,Arial;min-width:220px;">
+              <div style="font-weight:800;margin-bottom:4px;">${escapeHtml(st.stationName || "Station")}</div>
+              <div style="opacity:.9;margin-bottom:6px;">
+                ${escapeHtml(st.Address || "")}<br/>
+                ${escapeHtml(st.City || "")}, ${escapeHtml(st.State || "")} ${escapeHtml(st.postalCode || "")}
+              </div>
+              <div style="font-size:12px;opacity:.9;line-height:1.35;">
+                <b>Charger:</b> ${escapeHtml(ctype)}<br/>
+                <b>Model:</b> ${escapeHtml(st.stationModel || "")}<br/>
+                <b>Ports:</b> ${escapeHtml(String(st.ports_total || ""))}
+              </div>
+              <div style="margin-top:8px;font-size:12px;">
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${Number(st.Lat)},${Number(st.Long)}" target="_blank" rel="noopener noreferrer">Directions (Google)</a>
+                &nbsp;|&nbsp;
+                <a href="https://maps.apple.com/?daddr=${Number(st.Lat)},${Number(st.Long)}" target="_blank" rel="noopener noreferrer">Directions (Apple)</a>
+              </div>
+            </div>
+          `;
+          marker.bindPopup(popupHtml);
+
+          if (showLines && count > 1){
+            L.polyline([[baseLat, baseLng],[finalLat, finalLng]], {
+              weight: 2,
+              opacity: 0.75
+            }).addTo(lineLayer);
+          }
         });
-      });
-
-      // click map background collapses
-      map.off("click");
-      map.on("click", () => clearExpanded());
-    }
-
-    function expandSite(key, group, baseLat, baseLng){
-      clearExpanded();
-      expandedKey = key;
-
-      const radiusMeters = Number(document.getElementById("radius").value || 55);
-      const showLines = document.getElementById("showLines").checked;
-      const count = group.length;
-
-      group.forEach((st, index) => {
-        let finalLat = baseLat;
-        let finalLng = baseLng;
-
-        if (count === 1){
-          // single charger: just show it at the true location
-        } else {
-          const angle = (index / count) * 2 * Math.PI;
-          const { dLat, dLng } = metersToLatLngOffsets(baseLat, radiusMeters, angle);
-          finalLat += dLat;
-          finalLng += dLng;
-        }
-
-        const name = st.stationName || "Station";
-        const address = st.Address || "";
-        const city = st.City || "";
-        const state = st.State || "";
-        const zip = st.postalCode || "";
-        const ctype = st["Charger type"] || st["Charger type (legend)"] || "";
-        const model = st.stationModel || "";
-        const ports = st.ports_total || "";
-
-        const icon = boltIcon(ctype);
-        const marker = L.marker([finalLat, finalLng], { icon }).addTo(expandedLayer);
-
-        const popupHtml = `
-          <div style="font-family:system-ui,Segoe UI,Roboto,Arial;min-width:220px;">
-            <div style="font-weight:800;margin-bottom:4px;">${escapeHtml(name)}</div>
-            <div style="opacity:.9;margin-bottom:6px;">
-              ${escapeHtml(address)}<br/>
-              ${escapeHtml(city)}, ${escapeHtml(state)} ${escapeHtml(zip)}
-            </div>
-            <div style="font-size:12px;opacity:.9;line-height:1.35;">
-              <b>Charger:</b> ${escapeHtml(ctype)}<br/>
-              <b>Model:</b> ${escapeHtml(model)}<br/>
-              <b>Ports:</b> ${escapeHtml(String(ports))}
-            </div>
-            <div style="margin-top:8px;font-size:12px;">
-              <a href="https://www.google.com/maps/dir/?api=1&destination=${Number(st.Lat)},${Number(st.Long)}" target="_blank" rel="noopener noreferrer">Directions (Google)</a>
-              &nbsp;|&nbsp;
-              <a href="https://maps.apple.com/?daddr=${Number(st.Lat)},${Number(st.Long)}" target="_blank" rel="noopener noreferrer">Directions (Apple)</a>
-            </div>
-          </div>
-        `;
-        marker.bindPopup(popupHtml);
-
-        if (showLines && count > 1){
-          L.polyline([[baseLat, baseLng],[finalLat, finalLng]], {
-            weight: 2,
-            opacity: 0.75,
-            dashArray: "6 6"
-          }).addTo(lineLayer);
-
-          L.circleMarker([baseLat, baseLng], {
-            radius: 4, weight: 2, opacity: 0.9, fillOpacity: 0.2
-          }).addTo(lineLayer);
-        }
       });
     }
 
@@ -323,7 +260,6 @@
       const text = await res.text();
       stationData = parseCSV(text);
 
-      // bounds to true points
       const pts = stationData
         .map(s => [Number(s.Lat), Number(s.Long)])
         .filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
@@ -333,30 +269,12 @@
         map.fitBounds(trueBounds.pad(0.18));
       }
 
-      buildSiteMarkers();
+      render();
     }
 
-    document.getElementById("radius").addEventListener("input", () => {
-      // if expanded, re-expand with new radius
-      if (!expandedKey) return;
-      const groups = groupByArea(stationData);
-      const group = groups[expandedKey];
-      if (!group) return;
-      const baseLat = Number(group[0].Lat);
-      const baseLng = Number(group[0].Long);
-      expandSite(expandedKey, group, baseLat, baseLng);
-    });
-
-    document.getElementById("showLines").addEventListener("change", () => {
-      if (!expandedKey) return;
-      const groups = groupByArea(stationData);
-      const group = groups[expandedKey];
-      if (!group) return;
-      const baseLat = Number(group[0].Lat);
-      const baseLng = Number(group[0].Long);
-      expandSite(expandedKey, group, baseLat, baseLng);
-    });
-
+    document.getElementById("radius").addEventListener("input", render);
+    document.getElementById("group").addEventListener("input", render);
+    document.getElementById("showLines").addEventListener("change", render);
     document.getElementById("recenter").addEventListener("click", () => {
       if (trueBounds) map.fitBounds(trueBounds.pad(0.18));
     });
