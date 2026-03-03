@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Lower Manhattan – South of Canal (Fleet Chargers)</title>
+  <title>South of Canal – Fleet Chargers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,49 +13,49 @@
     html, body, #map { height: 100%; margin: 0; }
 
     .filter-panel {
-      background: rgba(255,255,255,0.95);
-      padding: 10px 10px;
-      border-radius: 10px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      background: rgba(255,255,255,0.96);
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.18);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       font-size: 13px;
-      min-width: 220px;
+      min-width: 240px;
     }
-    .filter-title { font-weight: 700; margin-bottom: 6px; }
-    .filter-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .filter-title { font-weight: 700; margin-bottom: 8px; }
+    .filter-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+    .filter-row label { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
     .filter-row input[type="text"]{
       width: 100%;
-      padding: 6px 8px;
-      border: 1px solid rgba(0,0,0,0.2);
-      border-radius: 8px;
+      padding: 7px 9px;
+      border: 1px solid rgba(0,0,0,0.22);
+      border-radius: 10px;
       outline: none;
     }
-    .filter-actions{
-      display:flex; gap:8px; margin-top:8px;
-    }
+    .filter-actions { display:flex; gap:8px; margin-top:8px; }
     .btn{
       flex:1;
-      padding: 6px 8px;
-      border: 1px solid rgba(0,0,0,0.2);
+      padding: 7px 9px;
+      border: 1px solid rgba(0,0,0,0.22);
       background: #fff;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
     }
     .btn:hover{ background:#f4f4f4; }
 
+    /* Bolt marker */
     .boltWrap{
-      width: 34px; height: 34px;
+      width: 36px; height: 36px;
       border-radius: 999px;
       display:flex; align-items:center; justify-content:center;
       border: 2px solid rgba(0,0,0,0.18);
-      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.20);
       position: relative;
       transform: translate(-50%, -50%);
     }
     .boltSVG{ width: 18px; height: 18px; display:block; }
     .badge{
       position:absolute;
-      right:-6px; top:-6px;
+      right:-7px; top:-7px;
       min-width: 16px; height: 16px;
       padding: 0 4px;
       border-radius: 999px;
@@ -74,13 +74,13 @@
   <div id="map"></div>
 
   <script>
+    // --- View: Lower Manhattan (rough) ---
     const lowerManhattanBounds = L.latLngBounds(
       [40.6970, -74.0220],
       [40.7245, -73.9900]
     );
 
     const map = L.map('map', { preferCanvas: true });
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors'
@@ -88,25 +88,33 @@
 
     map.fitBounds(lowerManhattanBounds, { padding: [20, 20] });
 
-    map.setMaxBounds(lowerManhattanBounds.pad(0.35));
-    map.on('drag', () => map.panInsideBounds(map.getMaxBounds(), { animate: false }));
+    // --- CSV (root of GitHub Pages) ---
+    const CSV_URL = 'https://flashe24v.github.io/South_of_Canal_St.csv';
 
-    const CSV_URL = 'https://flashe24v.github.io/LowerManhattan/South_of_Canal_St.csv';
+    // --- Layers ---
+    const markerLayer = L.layerGroup().addTo(map);
+    const lineLayer = L.layerGroup().addTo(map);
 
     let allRows = [];
-    let markerLayer = L.layerGroup().addTo(map);
 
-    // --- no-overlap spread ---
+    // --- Helpers ---
+    function norm(v) {
+      return String(v || '').toLowerCase().replace(/\s+/g,' ').trim();
+    }
+
+    // Spread + leader lines
     function keyFor(lat, lng) {
       const p = 5;
       return `${lat.toFixed(p)},${lng.toFixed(p)}`;
     }
     function metersToLatDeg(m) { return m / 111320; }
     function metersToLngDeg(m, atLat) { return m / (111320 * Math.cos(atLat * Math.PI / 180)); }
+
     function offsetPoint(lat, lng, indexInBucket) {
       if (indexInBucket === 0) return [lat, lng];
-      const angle = (indexInBucket * 137.5) * Math.PI / 180;
-      const radiusMeters = 10 + (Math.floor(indexInBucket / 6) * 6);
+      const angle = (indexInBucket * 137.5) * Math.PI / 180; // golden angle
+      // More spacing than before:
+      const radiusMeters = 18 + (Math.floor(indexInBucket / 6) * 10); // 18m, 28m, 38m...
       const dLat = metersToLatDeg(radiusMeters) * Math.sin(angle);
       const dLng = metersToLngDeg(radiusMeters, lat) * Math.cos(angle);
       return [lat + dLat, lng + dLng];
@@ -119,9 +127,8 @@
       return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     }
 
-    // --- icon ---
     function boltIcon(chargerType, portsTotal) {
-      const isL3 = String(chargerType).toLowerCase().includes('level 3');
+      const isL3 = norm(chargerType).includes('level 3') || norm(chargerType).includes('l3');
       const bg = isL3 ? '#00c2ff' : '#00e08a';
       const boltFill = '#0b0b0b';
 
@@ -141,88 +148,32 @@
       return L.divIcon({
         className: '',
         html,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
         popupAnchor: [0, -18]
       });
     }
 
-    // --- filters ---
+    // --- Filter state ---
     const state = { showL2: true, showL3: true, search: '' };
 
-    const FilterControl = L.Control.extend({
-      options: { position: 'topright' },
-      onAdd: function() {
-        const div = L.DomUtil.create('div', 'filter-panel');
-        div.innerHTML = `
-          <div class="filter-title">Filters</div>
-
-          <div class="filter-row">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input id="chkL2" type="checkbox" checked />
-              <span>Level 2</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-left:10px;">
-              <input id="chkL3" type="checkbox" checked />
-              <span>Level 3</span>
-            </label>
-          </div>
-
-          <div class="filter-row">
-            <input id="txtSearch" type="text" placeholder="Search station / address..." />
-          </div>
-
-          <div class="filter-actions">
-            <button id="btnApply" class="btn">Apply</button>
-            <button id="btnReset" class="btn">Reset</button>
-          </div>
-        `;
-
-        L.DomEvent.disableClickPropagation(div);
-        L.DomEvent.disableScrollPropagation(div);
-
-        setTimeout(() => {
-          const chkL2 = div.querySelector('#chkL2');
-          const chkL3 = div.querySelector('#chkL3');
-          const txtSearch = div.querySelector('#txtSearch');
-          const btnApply = div.querySelector('#btnApply');
-          const btnReset = div.querySelector('#btnReset');
-
-          btnApply.onclick = () => {
-            state.showL2 = chkL2.checked;
-            state.showL3 = chkL3.checked;
-            state.search = (txtSearch.value || '').trim().toLowerCase();
-            render();
-          };
-
-          btnReset.onclick = () => {
-            chkL2.checked = true;
-            chkL3.checked = true;
-            txtSearch.value = '';
-            state.showL2 = true;
-            state.showL3 = true;
-            state.search = '';
-            render(true);
-          };
-
-          txtSearch.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') btnApply.click();
-          });
-        }, 0);
-
-        return div;
-      }
-    });
-
-    map.addControl(new FilterControl());
+    function isLevel2(r) {
+      const t1 = norm(r['Charger type']);
+      const t2 = norm(r['Charger type (legend)']);
+      return t1.includes('level 2') || t1.includes('l2') || t2.includes('level 2') || t2.includes('l2');
+    }
+    function isLevel3(r) {
+      const t1 = norm(r['Charger type']);
+      const t2 = norm(r['Charger type (legend)']);
+      return t1.includes('level 3') || t1.includes('l3') || t2.includes('level 3') || t2.includes('l3');
+    }
 
     function rowMatchesFilters(r) {
-      const t = (r['Charger type'] || '').toLowerCase();
-      const isL2 = t.includes('level 2');
-      const isL3 = t.includes('level 3');
+      const l2 = isLevel2(r);
+      const l3 = isLevel3(r);
 
-      if (!state.showL2 && isL2) return false;
-      if (!state.showL3 && isL3) return false;
+      if (!state.showL2 && l2) return false;
+      if (!state.showL3 && l3) return false;
       if (!state.showL2 && !state.showL3) return false;
 
       if (state.search) {
@@ -234,8 +185,84 @@
       return true;
     }
 
+    // --- Robust filter control (no setTimeout wiring) ---
+    const FilterControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd: function() {
+        const div = L.DomUtil.create('div', 'filter-panel');
+
+        const title = L.DomUtil.create('div', 'filter-title', div);
+        title.textContent = 'Filters';
+
+        const row1 = L.DomUtil.create('div', 'filter-row', div);
+
+        const lblL2 = document.createElement('label');
+        const chkL2 = document.createElement('input');
+        chkL2.type = 'checkbox'; chkL2.checked = true;
+        lblL2.appendChild(chkL2);
+        lblL2.appendChild(document.createTextNode('Level 2'));
+        row1.appendChild(lblL2);
+
+        const lblL3 = document.createElement('label');
+        const chkL3 = document.createElement('input');
+        chkL3.type = 'checkbox'; chkL3.checked = true;
+        lblL3.appendChild(chkL3);
+        lblL3.appendChild(document.createTextNode('Level 3'));
+        row1.appendChild(lblL3);
+
+        const row2 = L.DomUtil.create('div', 'filter-row', div);
+        const txt = document.createElement('input');
+        txt.type = 'text';
+        txt.placeholder = 'Search station / address...';
+        row2.appendChild(txt);
+
+        const actions = L.DomUtil.create('div', 'filter-actions', div);
+        const btnApply = document.createElement('button');
+        btnApply.className = 'btn';
+        btnApply.textContent = 'Apply';
+        const btnReset = document.createElement('button');
+        btnReset.className = 'btn';
+        btnReset.textContent = 'Reset';
+        actions.appendChild(btnApply);
+        actions.appendChild(btnReset);
+
+        // Stop clicks from moving the map
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+
+        function applyNow() {
+          state.showL2 = chkL2.checked;
+          state.showL3 = chkL3.checked;
+          state.search = (txt.value || '').trim().toLowerCase();
+          render();
+        }
+
+        btnApply.addEventListener('click', applyNow);
+        btnReset.addEventListener('click', () => {
+          chkL2.checked = true;
+          chkL3.checked = true;
+          txt.value = '';
+          state.showL2 = true;
+          state.showL3 = true;
+          state.search = '';
+          render(true);
+        });
+
+        // Optional: live update when toggling checkboxes
+        chkL2.addEventListener('change', applyNow);
+        chkL3.addEventListener('change', applyNow);
+        txt.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyNow(); });
+
+        return div;
+      }
+    });
+
+    map.addControl(new FilterControl());
+
+    // --- Render ---
     function render(resetToBounds=false) {
       markerLayer.clearLayers();
+      lineLayer.clearLayers();
 
       const buckets = new Map();
       const markers = [];
@@ -245,14 +272,24 @@
         const lng = parseFloat(r['Long']);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
+        // Keep to your south-of-canal-ish bounds (since CSV already is, but safe)
         if (!lowerManhattanBounds.contains([lat, lng])) return;
+
         if (!rowMatchesFilters(r)) return;
 
-        const k = keyFor(lat, lng);
-        const count = buckets.get(k) ?? 0;
-        buckets.set(k, count + 1);
+        const key = keyFor(lat, lng);
+        const count = buckets.get(key) ?? 0;
+        buckets.set(key, count + 1);
 
         const [lat2, lng2] = offsetPoint(lat, lng, count);
+
+        // Draw leader line if offset occurred
+        if (count > 0) {
+          L.polyline([[lat, lng], [lat2, lng2]], {
+            weight: 2,
+            opacity: 0.65
+          }).addTo(lineLayer);
+        }
 
         const name = r['stationName'] || 'Station';
         const address = r['Address'] || '';
@@ -263,7 +300,6 @@
         const model = r['stationModel'] || '';
         const ports = r['ports_total'] || '';
 
-        // POPUP: show only "Charger type" (no legend)
         const popup = `
           <b>${name}</b><br/>
           ${chargerType ? `${chargerType}<br/>` : ''}
@@ -291,11 +327,15 @@
       }
     }
 
+    // --- Load CSV ---
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
       skipEmptyLines: true,
-      complete: ({ data }) => { allRows = data || []; render(true); },
+      complete: ({ data }) => {
+        allRows = data || [];
+        render(true);
+      },
       error: (err) => {
         console.error('CSV load error:', err);
         alert('Could not load CSV. Confirm the GitHub Pages URL is correct and public.');
