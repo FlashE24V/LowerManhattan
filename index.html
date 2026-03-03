@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Lower Manhattan (South of Canal) – CSV Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    // Lower Manhattan bounds (rough box: Battery Park up to ~Canal St)
+    const lowerManhattanBounds = L.latLngBounds(
+      [40.6970, -74.0220], // SW
+      [40.7245, -73.9900]  // NE
+    );
+
+    const map = L.map('map', { preferCanvas: true });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.fitBounds(lowerManhattanBounds, { padding: [20, 20] });
+
+    // Keep view generally around Lower Manhattan
+    map.setMaxBounds(lowerManhattanBounds.pad(0.35));
+    map.on('drag', () => map.panInsideBounds(map.getMaxBounds(), { animate: false }));
+
+    // Your GitHub Pages CSV
+    const CSV_URL = 'https://flashe24v.github.io/LowerManhattan/South_of_Canal_St.csv';
+
+    // --- No-overlap (spread duplicates) ---
+    const buckets = new Map();
+
+    function keyFor(lat, lng) {
+      const p = 5; // grouping precision
+      return `${lat.toFixed(p)},${lng.toFixed(p)}`;
+    }
+
+    function metersToLatDeg(m) { return m / 111320; }
+    function metersToLngDeg(m, atLat) { return m / (111320 * Math.cos(atLat * Math.PI / 180)); }
+
+    function offsetPoint(lat, lng, indexInBucket) {
+      if (indexInBucket === 0) return [lat, lng];
+
+      const angle = (indexInBucket * 137.5) * Math.PI / 180; // golden-angle
+      const radiusMeters = 8 + (Math.floor(indexInBucket / 6) * 6); // 8m, 14m, 20m...
+
+      const dLat = metersToLatDeg(radiusMeters) * Math.sin(angle);
+      const dLng = metersToLngDeg(radiusMeters, lat) * Math.cos(angle);
+
+      return [lat + dLat, lng + dLng];
+    }
+
+    function appleMapsLink(lat, lng) {
+      return `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+    }
+    function googleMapsLink(lat, lng) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    }
+
+    const markers = [];
+
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: ({ data }) => {
+        (data || []).forEach((r) => {
+          const lat = parseFloat(r['Lat']);
+          const lng = parseFloat(r['Long']);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+          // (Optional) ensure we keep it to south-of-canal-ish view area
+          if (!lowerManhattanBounds.contains([lat, lng])) return;
+
+          const k = keyFor(lat, lng);
+          const count = buckets.get(k) ?? 0;
+          buckets.set(k, count + 1);
+
+          const [lat2, lng2] = offsetPoint(lat, lng, count);
+
+          const name = r['stationName'] || 'Station';
+          const address = r['Address'] || '';
+          const city = r['City'] || '';
+          const state = r['State'] || '';
+          const zip = r['postalCode'] || '';
+          const level = r['Charger type'] || '';
+          const legend = r['Charger type (legend)'] || '';
+          const model = r['stationModel'] || '';
+          const ports = r['ports_total'] || '';
+
+          const popup = `
+            <b>${name}</b><br/>
+            ${level ? `${level}<br/>` : ''}
+            ${legend ? `${legend}<br/>` : ''}
+            ${model ? `Model: ${model}<br/>` : ''}
+            ${ports ? `Ports: ${ports}<br/>` : ''}
+            ${address ? `${address}<br/>` : ''}
+            ${(city || state || zip) ? `${city}${city && state ? ', ' : ''}${state} ${zip}<br/>` : ''}
+            <div style="margin-top:6px;">
+              <a href="${googleMapsLink(lat, lng)}" target="_blank" rel="noopener">Google Maps</a>
+              &nbsp;|&nbsp;
+              <a href="${appleMapsLink(lat, lng)}" target="_blank" rel="noopener">Apple Maps</a>
+            </div>
+          `;
+
+          const m = L.marker([lat2, lng2]).addTo(map);
+          m.bindPopup(popup);
+          markers.push(m);
+        });
+
+        if (markers.length) {
+          map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
+        }
+      },
+      error: (err) => {
+        console.error('CSV load error:', err);
+        alert('Could not load CSV. Confirm the GitHub Pages URL is correct and publicly accessible.');
+      }
+    });
+  </script>
+</body>
+</html>
