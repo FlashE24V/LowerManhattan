@@ -91,8 +91,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script>
     const CSV_URL   = "South_of_Canal_St.csv";
-    const CLUSTER_M = 30;
-    const SPREAD_M  = 80;
+    const CLUSTER_M = 60; // group stations within ~1 block
 
     const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.0060], 14);
 
@@ -103,7 +102,6 @@
 
     // ── Icons ─────────────────────────────────────────────────────────────
     function boltIcon(level, stationName) {
-      // Custom Revel icon
       if (String(stationName || "").toUpperCase().includes("REVEL")) {
         return L.icon({
           iconUrl:     "REVEl.png",
@@ -184,12 +182,14 @@
       return clusters;
     }
 
-    // ── Spread ────────────────────────────────────────────────────────────
+    // ── Spread — radius scales with cluster size so markers never overlap ──
     function spreadPosition(centLat, centLng, index, total) {
       if (total === 1) return [centLat, centLng];
-      const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
-      const dLat  = (SPREAD_M * Math.cos(angle)) / 111320;
-      const dLng  = (SPREAD_M * Math.sin(angle)) / (111320 * Math.cos(centLat * Math.PI / 180));
+      // Each marker gets 40m of arc space — radius grows automatically
+      const radius = (total * 40) / (2 * Math.PI);
+      const angle  = (index / total) * 2 * Math.PI - Math.PI / 2;
+      const dLat   = (radius * Math.cos(angle)) / 111320;
+      const dLng   = (radius * Math.sin(angle)) / (111320 * Math.cos(centLat * Math.PI / 180));
       return [centLat + dLat, centLng + dLng];
     }
 
