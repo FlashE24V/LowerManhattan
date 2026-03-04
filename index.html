@@ -92,35 +92,40 @@
   <script>
     const CSV_URL   = "South_of_Canal_St.csv";
     const CLUSTER_M = 30;
-    const SPREAD_M  = 80; // wider spread like the screenshot
+    const SPREAD_M  = 80;
 
     const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.0060], 14);
 
-    // Plain OSM tiles — full color, no filter
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // ── Icons — solid dark fill, thick colored ring, bold bolt ────────────
-    function boltIcon(level) {
-      const isL3   = String(level || "").includes("3");
-      const ring   = isL3 ? "#4db8ff" : "#00e676";
-      const size   = 36;
-      const inner  = Math.round(size * 0.52);
+    // ── Icons ─────────────────────────────────────────────────────────────
+    function boltIcon(level, stationName) {
+      // Custom Revel icon
+      if (String(stationName || "").toUpperCase().includes("REVEL")) {
+        return L.icon({
+          iconUrl:     "REVEl.png",
+          iconSize:    [40, 40],
+          iconAnchor:  [20, 20],
+          popupAnchor: [0, -26]
+        });
+      }
+
+      const isL3  = String(level || "").includes("3");
+      const ring  = isL3 ? "#4db8ff" : "#00e676";
+      const size  = 36;
+      const inner = Math.round(size * 0.52);
 
       return L.divIcon({
         className: "",
         html: `<div style="
-            width:${size}px;
-            height:${size}px;
-            border-radius:50%;
+            width:${size}px;height:${size}px;border-radius:50%;
             background:#1a1a2e;
             border:3px solid ${ring};
             box-shadow:0 0 0 2px rgba(0,0,0,0.15), 0 3px 10px rgba(0,0,0,0.3);
-            display:flex;
-            align-items:center;
-            justify-content:center;">
+            display:flex;align-items:center;justify-content:center;">
           <svg width="${inner}" height="${inner}" viewBox="0 0 24 24" fill="${ring}">
             <path d="M13 2L3 14h7l-1 8 12-14h-7z"/>
           </svg>
@@ -179,7 +184,7 @@
       return clusters;
     }
 
-    // ── Spread — even circle, fixed radius ────────────────────────────────
+    // ── Spread ────────────────────────────────────────────────────────────
     function spreadPosition(centLat, centLng, index, total) {
       if (total === 1) return [centLat, centLng];
       const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
@@ -254,7 +259,7 @@
               </div>
             </div>`;
 
-          L.marker([fLat, fLng], { icon: boltIcon(st["Charger type"]) })
+          L.marker([fLat, fLng], { icon: boltIcon(st["Charger type"], st.stationName) })
             .addTo(markerLayer)
             .bindPopup(popup, { maxWidth: 260 });
         });
